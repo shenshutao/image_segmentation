@@ -14,7 +14,7 @@ class FCN:
 
         return croped_ts
 
-    def get_fcn32s_model(input_shape=(224, 224, 3), class_no=60):
+    def get_fcn32s_model(input_shape=(224, 224, 3), class_no=21):
         """
         FCN 32 模型
         :param input_shape: （输入图片长，输入图片宽，RGB层数）,注意长宽最好是32的倍数
@@ -39,7 +39,7 @@ class FCN:
 
             # 使用反卷积做Upsampling
             x = layers.Conv2DTranspose(filters=class_no, kernel_size=(64, 64), strides=(32, 32), padding='same',
-                                       use_bias=False, name='fc8')(x)
+                                       use_bias=False, name='Upsampling1')(x)
 
         # 如果size不够，再做一个Bilinear的Upsampling（通常在图片size不为32的倍数时候需要）
         if K.int_shape(x)[1:3] != K.int_shape(input_tensor)[1:3]:
@@ -53,7 +53,7 @@ class FCN:
 
         return model
 
-    def get_fcn16s_model(input_shape=(224, 224, 3), class_no=60):
+    def get_fcn16s_model(input_shape=(224, 224, 3), class_no=21):
         """
         FCN 16 模型
         :param input_shape: （输入图片长，输入图片宽，RGB层数）,注意长宽最好是32的倍数
@@ -79,7 +79,7 @@ class FCN:
 
             # 使用反卷积做Upsampling到2倍
             x = layers.Conv2DTranspose(filters=class_no, kernel_size=(4, 4), strides=(2, 2), padding='same',
-                                       use_bias=False, name='upsampling')(x)
+                                       use_bias=False, name='upsampling1')(x)
 
             # print(tf.size_shape(x))
             with tf.variable_scope("fcn_16s"):
@@ -92,7 +92,7 @@ class FCN:
 
             # 使用反卷积做Upsampling到32倍
             x = layers.Conv2DTranspose(filters=class_no, kernel_size=(32, 32), strides=(16, 16), padding='same',
-                                       use_bias=False, name='upsampling_2')(x)
+                                       use_bias=False, name='upsampling2')(x)
 
         # 如果size不够，再做一个Bilinear的Upsampling（通常在图片size不为32的倍数时候需要）
         if K.int_shape(x)[1:3] != K.int_shape(input_tensor)[1:3]:
@@ -106,7 +106,7 @@ class FCN:
 
         return model
 
-    def get_fcn8s_model(input_shape=(224, 224, 3), class_no=60):
+    def get_fcn8s_model(input_shape=(224, 224, 3), class_no=21):
         """
         FCN 8 模型
         :param input_shape: （输入图片长，输入图片宽，RGB层数）,注意长宽最好是32的倍数
@@ -155,7 +155,7 @@ class FCN:
 
             # 使用反卷积做Upsampling
             x = layers.Conv2DTranspose(filters=class_no, kernel_size=(16, 16), strides=(8, 8), padding='same',
-                                       use_bias=False, name='upsampling_2')(x)
+                                       use_bias=False, name='upsampling3')(x)
 
         # 如果size不够，再做一个Bilinear的Upsampling（通常在图片size不为32的倍数时候需要）
         if K.int_shape(x)[1:3] != K.int_shape(input_tensor)[1:3]:
