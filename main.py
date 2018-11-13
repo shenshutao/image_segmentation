@@ -40,9 +40,9 @@ def get_voc_generator(voc_path, batch_size, input_hw=(224, 224, 3), mask_hw=(32,
                     mask_path = os.path.join(voc_path, 'SegmentationClass', image_name + '.png')
                     mask = Image.open(mask_path)
                     mask = mask.resize(mask_hw[0:2], Image.NEAREST)
-                    mask_np = np.asarray(mask, dtype=np.uint8)
+                    mask_np = np.asarray(mask, dtype=np.uint8).copy()
 
-                    # TODO @shutao, Do one-hot encoding, Special for Pascal VOC dataset.
+                    mask_np[mask_np == 255] = 0  # zero, indicating background.
                     mask_np = to_categorical(mask_np, num_classes=mask_hw[2])
 
                     batch_masks[batch_id] = mask_np
@@ -50,13 +50,14 @@ def get_voc_generator(voc_path, batch_size, input_hw=(224, 224, 3), mask_hw=(32,
                     batch_id += 1
                     if batch_id == batch_size:
                         batch_id = 0
-                        yield image_np, mask_np
-                except FileNotFoundError as e:
-                    print('Image not found', image_name)
-
-
+                        yield batch_images, batch_masks
+                except FileNotFoundError:
+                    print('Image not found, Ignore', image_name)
 # endregion
 
+
 if __name__ == "__main__":
-    gen = get_voc_generator(voc2012_folder, 3, input_hw=(224, 224, 3), mask_hw=(32, 32, 20))
+    gen = get_voc_generator(voc2012_folder, 16, input_hw=(224, 224, 3), mask_hw=(224, 224, 21))
     print(next(gen))
+    print(next(gen)[0].shape)
+    print(next(gen)[1].shape)
