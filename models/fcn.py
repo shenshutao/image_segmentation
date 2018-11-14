@@ -2,7 +2,7 @@ import tensorflow as tf
 from keras import layers, models
 from keras.applications import VGG16
 import keras.backend as K
-import keras
+
 
 class FCN:
     def center_crop(original_ts, target_ts):

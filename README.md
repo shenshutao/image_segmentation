@@ -1,5 +1,4 @@
-# 未完成，还在写
+# Horse dataset is downloaded from http://www.msri.org/people/members/eranb/
 
 # Semantic Segmentation
 
-如果有错误，请联系sstwood@gmail.com
