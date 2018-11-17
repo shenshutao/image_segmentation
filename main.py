@@ -1,28 +1,34 @@
 import sys
 
-from PIL import Image
-import os
 from keras.callbacks import ModelCheckpoint, ReduceLROnPlateau, TensorBoard
+from keras.models import load_model
 
 from custom_loss import *
 from custom_metrics import *
-from models import *
 from data_gens import *
-from keras.models import load_model
+from models import *
 
 sys.setrecursionlimit(10000)
 
 if __name__ == "__main__":
     # Use VOC 2012 Dataset
-    horse_path = 'C:/Users/AlphaCat/Desktop/image_segmentation/weizmann_horse_db'
+    horse_path = 'weizmann_horse_db'
     batch_size = 8
 
     train_gen = horse_gen.get_horse_generator(horse_path, train_or_val='train', batch_size=batch_size,
                                               input_hw=(224, 224, 3), mask_hw=(224, 224, 2))
 
-    model = FCN.get_fcn16s_model(input_shape=(224, 224, 3), class_no=2)
+    # model = FCN.get_fcn8s_model(input_shape=(224, 224, 3), class_no=2)
+    # model = FCN.get_fcn16s_model(input_shape=(224, 224, 3), class_no=2)
+    model = FCN.get_fcn32s_model(input_shape=(224, 224, 3), class_no=2)
     # model = Unet.get_unet_model(input_shape=(224, 224, 3), class_no=2)
-    model.compile(loss='categorical_crossentropy', optimizer='adam', metrics=[mean_iou(num_class=2)])
+
+    # model.compile(loss='categorical_crossentropy', optimizer='adam', metrics=[mean_iou(num_class=2)])
+
+    loss_weight = [1, 2]
+    model.compile(loss=segmentation_weighted_categorical_crossentropy(loss_weight), optimizer='adam',
+                  metrics=[mean_iou(num_class=2)])
+
     model.summary()
 
     checkpoint = ModelCheckpoint('fcn16s.h5', verbose=1, save_best_only=False, period=3)
