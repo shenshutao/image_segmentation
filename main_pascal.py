@@ -5,6 +5,7 @@ import os
 from keras.callbacks import ModelCheckpoint, ReduceLROnPlateau, TensorBoard
 
 from custom_loss import *
+import numpy as np
 from custom_metrics import *
 from models.unet import Unet
 from data_gens.pascal_gen import get_voc_generator
