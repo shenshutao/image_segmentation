@@ -3,13 +3,12 @@ from custom_loss import *
 tf.enable_eager_execution()
 
 if __name__ == "__main__":
-
-    batch_bin_y_true = tf.constant([1., 0., 0.])
-    batch_bin_y_pred = tf.constant([0, 0.1, 0.5])
+    batch_bin_y_true = tf.constant([1., 1., 0., 0.])
+    batch_bin_y_pred = tf.constant([1., .6, 0.1, 0.3])
     loss1 = binary_crossentropy(batch_bin_y_true, batch_bin_y_pred)
 
     batch_cat_y_true = tf.constant([[1., 0., 0.], [0., 1., 0.]])
-    batch_cat_y_pred = tf.constant([[0., 0., 1.], [0.4, 0.1, 0.5]])
+    batch_cat_y_pred = tf.constant([[0., 0., 1.], [0.4, 0.1, 0.]])
 
     loss2 = categorical_crossentropy(batch_cat_y_true, batch_cat_y_pred)
 
@@ -37,10 +36,27 @@ if __name__ == "__main__":
     batch_hw_true = tf.constant(batch_hw_true, dtype=tf.float32)
     batch_hw_preds = tf.random_uniform(shape=[5, 224, 224, 3], minval=0, maxval=1, dtype=tf.float32)
 
-    swcce = segmentation_weighted_categorical_crossentropy([0.5, 1, 2])
+    # 图片语义分割
+    swcce = weighted_categorical_crossentropy([0.5, 1, 2])
     loss4 = swcce(batch_hw_true, batch_hw_preds)
 
     batch_hw_preds = batch_hw_true  # 如果pred值和true值一样，loss应该为0
     loss5 = swcce(batch_hw_true, batch_hw_preds)
     print(loss5.numpy())
 
+    focal_loss = binary_focal_loss()
+    loss6 = focal_loss(batch_bin_y_true, batch_bin_y_pred)
+    print(loss6.numpy())
+
+    batch_bin_y_true = tf.constant([1., 1., 0., 0.])
+    batch_bin_y_pred = tf.constant([1., 1., 0., 0.])
+    loss7 = focal_loss(batch_bin_y_true, batch_bin_y_pred)
+    print(loss7.numpy())
+
+    batch_bin_y_true = tf.constant([1., 1., 0., 0.])
+    batch_bin_y_pred = tf.constant([0., 0., 1., 1.])
+    loss8 = focal_loss(batch_bin_y_true, batch_bin_y_pred)
+    print(loss8.numpy())
+
+    cfl = categorical_focal_loss()
+    loss9 = cfl(batch_cat_y_true, batch_cat_y_pred)

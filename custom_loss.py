@@ -1,7 +1,9 @@
-import keras.backend as K
-import tensorflow as tf
+# -*- coding: utf-8 -*-
 import random
+
+import keras.backend as K
 import numpy as np
+import tensorflow as tf
 from keras.utils.np_utils import to_categorical
 
 
@@ -31,10 +33,8 @@ def binary_crossentropy(batch_y_true, batch_y_pred):
     :param batch_y_true: 维度为 [batch_size]
     :param batch_y_pred: 维度为 [batch_size]
     """
-    # 下式中，给batch_y_pred加上了一个epsilon 1e-10, log(0)值为-inf，tf里面 0 * -inf = nan。
-
     # 先求batch中每个样本的cross entropy值
-    batch_y_pred = tf.clip_by_value(batch_y_pred, 1e-10, 1-1e-10)  # 防止log(0)为-inf，tf里面 0 * -inf = nan。
+    batch_y_pred = tf.clip_by_value(batch_y_pred, K.epsilon(), 1 - K.epsilon())  # 防止log(0)为-inf，tf里面 0 * -inf = nan
     batch_loss = batch_y_true * tf.log(batch_y_pred) + (1 - batch_y_pred) * tf.log(1 - batch_y_pred)
     # 再对这个batch中的loss求平均值
     loss = - tf.reduce_mean(batch_loss)
@@ -42,14 +42,62 @@ def binary_crossentropy(batch_y_true, batch_y_pred):
     return loss
 
 
+def binary_focal_loss(alpha=.25, gamma=2.):
+    def focal_loss(batch_y_true, batch_y_pred):
+        """
+        :param batch_y_true: 维度为 [batch_size]
+        :param batch_y_pred: 维度为 [batch_size]
+        """
+        pt = tf.where(tf.equal(batch_y_true, 1), batch_y_pred, 1 - batch_y_pred)
+        # pt = tf.clip_by_value(pt, K.epsilon(), 1)  # 不会有 0 * -inf 发生，无需clip
+        batch_loss = - alpha * (1 - pt) ** gamma * tf.log(pt)
+        loss = tf.reduce_mean(batch_loss)
+        return loss
+
+    return focal_loss
+
+
+def categorical_focal_loss(alpha=None, gamma=2.):
+    """
+    :param alpha: 维度为 [class_no]
+    :param gamma: Float32
+    """
+
+    def focal_loss(batch_y_true, batch_y_pred):
+        """
+        :param batch_y_true: 维度为 [batch_size, class_no]
+        :param batch_y_pred: 维度为 [batch_size, class_no]
+        """
+        # print(batch_y_true.numpy())  # eager mode 下测试会很简单，custom_loss_eagermode.py
+        # print(batch_y_pred.numpy())
+        # 下面这段只是 防止 0*-inf = nan 发生的另一种方法而已, y_true == 0时，让y_pred != 0, 随便什么数字，
+        # 反正这个y_pred会乘以y_true即0不会对loss值起作用，只要不发生 0 * log(0) 的情况就好。
+        batch_y_pred = tf.where(tf.equal(batch_y_true, 0), tf.ones_like(batch_y_pred), batch_y_pred)
+        # batch_y_pred = tf.clip_by_value(batch_y_pred, K.epsilon(), 1)  # 与上面这个，二选一
+        if alpha:
+            batch_loss = tf.reduce_sum(- alpha * batch_y_true * (1 - batch_y_pred) ** gamma * tf.log(batch_y_pred), -1)
+        else:
+            batch_loss = tf.reduce_sum(- batch_y_true * (1 - batch_y_pred) ** gamma * tf.log(batch_y_pred), -1)
+        # print(batch_loss.numpy())
+        loss = tf.reduce_mean(batch_loss)
+        # print(loss.numpy())
+        return loss
+
+    return focal_loss
+
+
 def categorical_crossentropy(batch_y_true, batch_y_pred):
     """
+    图片分类：
     :param batch_y_true: 维度为 [batch_size, class_no]
     :param batch_y_pred: 维度为 [batch_size, class_no]
+    图片分割：
+    :param batch_y_true: 维度为 [batch_size, image_H, image_W, class_no]
+    :param batch_y_pred: 维度为 [batch_size, image_H, image_W, class_no]
     """
     # 先求batch中每个样本的cross entropy值
-    batch_y_pred = tf.clip_by_value(batch_y_pred, 1e-10, 1)  # 防止log(0)为-inf，tf里面 0 * -inf = nan。
-    batch_loss = tf.reduce_sum(batch_y_true * tf.log(batch_y_pred), 1)
+    batch_y_pred = tf.clip_by_value(batch_y_pred, K.epsilon(), 1)  # 防止log(0)为-inf，tf里面 0 * -inf = nan。
+    batch_loss = tf.reduce_sum(batch_y_true * tf.log(batch_y_pred), -1)  # 分类时为1， 分割时为3，放-1兼容两者。
     # 再对这个batch中的loss求平均值
     loss = - tf.reduce_mean(batch_loss)
     return loss
@@ -68,44 +116,16 @@ def weighted_categorical_crossentropy(weights):
 
     def loss(batch_y_true, batch_y_pred):
         """
+        图片分类：
         :param batch_y_true: 维度为 [batch_size, class_no]
         :param batch_y_pred: 维度为 [batch_size, class_no]
-        """
-        # 先求batch中每个样本的cross entropy值
-        batch_y_pred = tf.clip_by_value(batch_y_pred, 1e-10, 1)
-        batch_loss = tf.reduce_sum(batch_y_true * tf.log(batch_y_pred) * weights, 1)
-        # 再对这个batch中的loss求平均值
-        loss = - tf.reduce_mean(batch_loss)
-        return loss
-
-    return loss
-
-
-def segmentation_weighted_categorical_crossentropy(weights):
-    """
-    在categorical_crossentropy的基础上，为每个类别返回的loss值加上权重
-    :param weights: 维度为 [class_no]
-
-    用法：
-    loss = weighted_categorical_crossentropy([0.5, 1, 2])  # 类别的loss权重分别为 0.5, 1, 2
-    model.compile(loss=loss,optimizer='adam')
-    """
-    weights = tf.constant(weights, dtype=tf.float32)
-
-    def loss(batch_hw_y_true, batch_hw_y_pred):
-        """
+        图片分割：
         :param batch_y_true: 维度为 [batch_size, image_H, image_W, class_no]
         :param batch_y_pred: 维度为 [batch_size, image_H, image_W, class_no]
         """
-        print(K.int_shape(batch_hw_y_true))
-        print(K.int_shape(batch_hw_y_pred))
-        print(K.dtype(batch_hw_y_true))
-        print(K.dtype(batch_hw_y_pred))
-
-        # clip pred value, 防止log(0)
-        batch_hw_y_pred = tf.clip_by_value(batch_hw_y_pred, 1e-10, 1)
-        # 先求batch中每个样本的cross entropy值, weights在做乘法的时候会自动broadcast
-        batch_loss = tf.reduce_sum(batch_hw_y_true * tf.log(batch_hw_y_pred) * weights, 3)
+        # 先求batch中每个样本的cross entropy值
+        batch_y_pred = tf.clip_by_value(batch_y_pred, K.epsilon(), 1)
+        batch_loss = tf.reduce_sum(batch_y_true * tf.log(batch_y_pred) * weights, -1)  # 分类时为1， 分割时为3，放-1兼容两者。
         # 再对这个batch中的loss求平均值
         loss = - tf.reduce_mean(batch_loss)
         return loss
@@ -131,8 +151,10 @@ if __name__ == "__main__":
         print(sess.run(loss3))
 
         # Batch:2 H:2 W:2 Class_no:3
-        batch_hw_cat_y_true = tf.constant([[[[1., 0., 0.], [0., 1., 1.]], [[1., 0., 0.], [0., 1., 0.]]], [[[1., 0., 0.], [0., 1., 1.]], [[1., 0., 0.], [0., 1., 0.]]]])
-        batch_hw_cat_y_pred = tf.constant([[[[0., 0., .2], [1., 1., .8]], [[.4, .1, .3], [.5, .7, .1]]], [[[1., 0., 0.], [0., 1., 1.]], [[1., 0., 0.], [0., 1., 0.]]]])
+        batch_hw_cat_y_true = tf.constant([[[[1., 0., 0.], [0., 1., 1.]], [[1., 0., 0.], [0., 1., 0.]]],
+                                           [[[1., 0., 0.], [0., 1., 1.]], [[1., 0., 0.], [0., 1., 0.]]]])
+        batch_hw_cat_y_pred = tf.constant([[[[0., 0., .2], [1., 1., .8]], [[.4, .1, .3], [.5, .7, .1]]],
+                                           [[[1., 0., 0.], [0., 1., 1.]], [[1., 0., 0.], [0., 1., 0.]]]])
 
         logits = tf.random_uniform(shape=[5, 224, 224, 3], minval=0, maxval=1, dtype=tf.float32)
 
@@ -150,7 +172,8 @@ if __name__ == "__main__":
         batch_hw_true = tf.constant(batch_hw_true, dtype=tf.float32)
         batch_hw_preds = tf.random_uniform(shape=[5, 224, 224, 3], minval=0, maxval=1, dtype=tf.float32)
 
-        swcce = segmentation_weighted_categorical_crossentropy([0.5, 1, 2])
+        # 图片语义分割
+        swcce = weighted_categorical_crossentropy([0.5, 1, 2])
         loss4 = swcce(batch_hw_true, batch_hw_preds)
         print(sess.run(loss4))
 
