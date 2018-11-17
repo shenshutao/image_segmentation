@@ -9,6 +9,7 @@ from custom_metrics import *
 from models.unet import Unet
 from data_gens.pascal_gen import get_voc_generator
 from keras.models import load_model
+import numpy as np
 
 sys.setrecursionlimit(10000)
 
@@ -54,18 +55,18 @@ if __name__ == "__main__":
         img_np = val_images[0]
         img_np = (img_np + 1.) * 127.5
         im0 = Image.fromarray(np.uint8(img_np))
-        im0.save('output/img_{}.jpg'.format(i))
+        im0.save('output/{}_img.jpg'.format(i))
 
         res = model.predict(val_images)[0]
         pred_label = res.argmax(axis=2)
         im1 = Image.fromarray(np.uint8(pred_label))
         im1.putpalette(pascal_palette)
-        im1.save('output/pred_{}.png'.format(i))
+        im1.save('output/{}_pred.png'.format(i))
 
         true_label = mask[0].argmax(axis=2)
         im2 = Image.fromarray(np.uint8(true_label))
         im2.putpalette(pascal_palette)
-        im2.save('output/true_{}.png'.format(i))
+        im2.save('output/{}_true.png'.format(i))
 
         i += 1
         if i == 100:
