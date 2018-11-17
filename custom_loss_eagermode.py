@@ -1,6 +1,8 @@
 import keras.backend as K
 import tensorflow as tf
 
+tf.enable_eager_execution()
+
 
 # def tversky(alpha=0.5, beta=0.5, axis=(0, 1, 2), smooth=1e-5):
 #     def loss(y_true, y_pred):
@@ -75,19 +77,18 @@ def weighted_categorical_crossentropy(weights):
 
 
 if __name__ == "__main__":
-    with tf.Session() as sess:
-        batch_bin_y_true = tf.constant([1., 0., 0.])
-        batch_bin_y_pred = tf.constant([0, 0.1, 0.5])
-        loss1 = binary_crossentropy(batch_bin_y_true, batch_bin_y_pred)
-        print(sess.run(loss1))
+    batch_bin_y_true = tf.constant([1., 0., 0.])
+    batch_bin_y_pred = tf.constant([0, 0.1, 0.5])
+    loss1 = binary_crossentropy(batch_bin_y_true, batch_bin_y_pred)
+    print(loss1.numpy())
 
-        batch_cat_y_true = tf.constant([[1., 0., 0.], [0., 1., 0.]])
-        batch_cat_y_pred = tf.constant([[0., 0., 1.], [0.4, 0.1, 0.5]])
+    batch_cat_y_true = tf.constant([[1., 0., 0.], [0., 1., 0.]])
+    batch_cat_y_pred = tf.constant([[0., 0., 1.], [0.4, 0.1, 0.5]])
 
-        loss2 = categorical_crossentropy(batch_cat_y_true, batch_cat_y_pred)
-        print(sess.run(loss2))
+    loss2 = categorical_crossentropy(batch_cat_y_true, batch_cat_y_pred)
+    print(loss2.numpy())
 
-        wcce = weighted_categorical_crossentropy([0.5, 1, 2])
-        loss3 = wcce(batch_cat_y_true, batch_cat_y_pred)
-        print(sess.run(loss3))
+    wcce = weighted_categorical_crossentropy([0.5, 1, 2])
+    loss3 = wcce(batch_cat_y_true, batch_cat_y_pred)
+    print(loss3.numpy())
 
