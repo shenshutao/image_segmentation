@@ -64,7 +64,7 @@ def weighted_categorical_crossentropy(weights):
     loss = weighted_categorical_crossentropy([0.5, 1, 2])  # 类别的loss权重分别为 0.5, 1, 2
     model.compile(loss=loss,optimizer='adam')
     """
-    weights = tf.constant(weights)
+    weights = tf.constant(weights, dtype=tf.float32)
 
     def loss(batch_y_true, batch_y_pred):
         """
