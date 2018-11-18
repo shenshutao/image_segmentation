@@ -25,11 +25,11 @@ if __name__ == "__main__":
     # model = FCN.get_fcn32s_model(input_shape=(224, 224, 3), class_no=21)
     model = Unet.get_unet_model(input_shape=(224, 224, 3), class_no=21)
     # # class 0 is the background, give it lower weight
-    # loss_weight = [1, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 5, 10, 10, 10, 10, 10]
+    loss_weight = [1, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 5, 10, 10, 10, 10, 10]
     # model.compile(loss=weighted_categorical_crossentropy(loss_weight), optimizer='adam', metrics=[mean_iou(num_class=21)])
     # model.compile(loss=tversky(), optimizer='adam', metrics=[mean_iou(num_class=21)])
     # model.compile(loss='categorical_crossentropy', optimizer='adam', metrics=[mean_iou(num_class=21)])
-    model.compile(loss=categorical_focal_loss(), optimizer=Adam(lr=0.05), metrics=[mean_iou])
+    model.compile(loss=categorical_focal_loss(alpha=loss_weight, gamma=5.), optimizer=Adam(lr=0.05), metrics=[mean_iou])
     model.summary()
 
     checkpoint = ModelCheckpoint('unet_pascal.h5', verbose=1, save_best_only=False, period=3)
