@@ -24,27 +24,28 @@ if __name__ == "__main__":
     # model = FCN.get_fcn32s_model(input_shape=(224, 224, 3), class_no=21)
     model = Unet.get_unet_model(input_shape=(224, 224, 3), class_no=21)
     # # class 0 is the background, give it lower weight
-    loss_weight = [1, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 5, 10, 10, 10, 10, 10]
-    model.compile(loss=weighted_categorical_crossentropy(loss_weight), optimizer='adam', metrics=[mean_iou(num_class=21)])
+    # loss_weight = [1, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 5, 10, 10, 10, 10, 10]
+    # model.compile(loss=weighted_categorical_crossentropy(loss_weight), optimizer='adam', metrics=[mean_iou(num_class=21)])
     # model.compile(loss=tversky(), optimizer='adam', metrics=[mean_iou(num_class=21)])
     # model.compile(loss='categorical_crossentropy', optimizer='adam', metrics=[mean_iou(num_class=21)])
+    model.compile(loss=categorical_focal_loss(), optimizer='adam', metrics=[mean_iou(num_class=21)])
     model.summary()
 
-    checkpoint = ModelCheckpoint('fcn.h5', verbose=1, save_best_only=False, period=3)
+    checkpoint = ModelCheckpoint('unet_pascal.h5', verbose=1, save_best_only=False, period=3)
     tensor_board = TensorBoard(log_dir='log', histogram_freq=0, write_graph=True, write_grads=True, write_images=True)
     learning_rate_reduction = ReduceLROnPlateau(monitor='loss', patience=2, verbose=1, factor=0.5, min_lr=0.000001)
 
     model.fit_generator(
         train_gen,
         steps_per_epoch=180,
-        epochs=20,
+        epochs=50,
         callbacks=[checkpoint, tensor_board, learning_rate_reduction]
     )
 
-    model.save('fcn.h5')
+    model.save('unet_pascal.h5')
 
     print('Start Test')
-    model = load_model('unet.h5', compile=False)
+    model = load_model('unet_pascal.h5', compile=False)
     # 取val集10张图片，测试一下效果
     val_gen = get_voc_generator(voc2012_folder, 'val', 1, input_hw=(224, 224, 3), mask_hw=(224, 224, 21))
     # Pascal Voc 使用了indexed color, 这里提取它的palette
