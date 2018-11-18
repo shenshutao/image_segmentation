@@ -1,13 +1,26 @@
 ## Briefing
-This is a image semantic segmentation demo using Keras.
+This is a image semantic segmentation demo using Keras.   
+To simplify the code, I choose the horse dataset, as the class is quite balance.      
+
+## Hourse Dataset
+Horse dataset is downloaded from http://www.msri.org/people/members/eranb/
  
 ## Nets
-Nets include FCN, Unet.
+1. FCN, https://arxiv.org/abs/1411.4038, translated from the original caffe code https://github.com/shelhamer/fcn.berkeleyvision.org 
+2. Unet, https://arxiv.org/abs/1505.04597    
+3. DeepLab V3+ (onging)
 
 ## Loss
-Inside the custom_loss, there are some losses not only for segmentation task, also for binary classification or category classification.
+Inside the custom_loss.py, there are some losses not only for segmentation task, also for binary classification or category classification.
 Some famous loss implemented, such as focal loss.
 
-## Dataset
-Horse dataset is downloaded from http://www.msri.org/people/members/eranb/
+The custom_loss_eagermode.py is only for loss function testing purpose, testing on eager mode is more efficient.   
+
+## Class imbalance
+However the class imbalance is always a big problem in daily segmentation tasks.     
+Tried on Pascal dataset, but the result is bad, still exploring.    
+1. Weight cross entropy, what's the reasonable loss weights for classes ? (ongoing)
+2. Dice loss / GDL (onging)
+3. Tversky loss  (onging)
+
 
