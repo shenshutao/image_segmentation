@@ -24,7 +24,7 @@ if __name__ == "__main__":
 
     # model = FCN.get_fcn16s_model(input_shape=(512, 512, 3), class_no=4)
     model = Unet.get_unet_model(input_shape=(512, 512, 3), class_no=4)
-    model.compile(loss='categorical_crossentropy', optimizer='adam', metrics=[mean_iou(num_class=4)])
+    model.compile(loss='categorical_crossentropy', optimizer='adam', metrics=[mean_iou])
     model.summary()
 
     checkpoint = ModelCheckpoint('zg.h5', verbose=1, save_best_only=False, period=3)

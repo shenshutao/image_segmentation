@@ -6,6 +6,7 @@ from keras.callbacks import ModelCheckpoint, ReduceLROnPlateau, TensorBoard
 
 from custom_loss import *
 import numpy as np
+from keras.optimizers import Adam
 from custom_metrics import *
 from models.unet import Unet
 from data_gens.pascal_gen import get_voc_generator
@@ -28,7 +29,7 @@ if __name__ == "__main__":
     # model.compile(loss=weighted_categorical_crossentropy(loss_weight), optimizer='adam', metrics=[mean_iou(num_class=21)])
     # model.compile(loss=tversky(), optimizer='adam', metrics=[mean_iou(num_class=21)])
     # model.compile(loss='categorical_crossentropy', optimizer='adam', metrics=[mean_iou(num_class=21)])
-    model.compile(loss=categorical_focal_loss(), optimizer='adam', metrics=[mean_iou(num_class=21)])
+    model.compile(loss=categorical_focal_loss(), optimizer=Adam(lr=0.05), metrics=[mean_iou])
     model.summary()
 
     checkpoint = ModelCheckpoint('unet_pascal.h5', verbose=1, save_best_only=False, period=3)

@@ -24,7 +24,7 @@ if __name__ == "__main__":
     model = Unet.get_unet_model(input_shape=(224, 224, 3), class_no=2)
 
     # model.compile(loss='categorical_crossentropy', optimizer='adam', metrics=[mean_iou(num_class=2)])
-    model.compile(loss=categorical_crossentropy, optimizer='adam', metrics=[mean_iou(num_class=2)])
+    model.compile(loss=categorical_crossentropy, optimizer='adam', metrics=[mean_iou])
 
     model.summary()
 

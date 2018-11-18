@@ -68,11 +68,9 @@ def categorical_focal_loss(alpha=None, gamma=2.):
         # 归一化，加下面这段是为了兼容最后一层非Softmax的情况，如果是Softmax的输出可以注释掉，因为那个输出已经归一化了。
         batch_y_pred /= tf.reduce_sum(batch_y_pred, -1, True)
 
-        # 下面这段只是 防止 0*-inf = nan 发生的另一种方法而已, y_true == 0时，让y_pred != 0, 随便什么数字，
-        # 反正这个y_pred会乘以y_true即0不会对loss值起作用，只要不发生 0 * log(0) 的情况就好。
-        batch_y_pred = tf.where(tf.equal(batch_y_true, 0), tf.ones_like(batch_y_pred), batch_y_pred)
-        # batch_y_pred = tf.clip_by_value(batch_y_pred, K.epsilon(), 1)  # 与上面这个，二选一
-
+        # 防止log(0)为-inf，tf里面 0 * -inf = nan
+        # 虽然也不影响back propagation，它只关心导数，不关心这个loss值。
+        batch_y_pred = tf.clip_by_value(batch_y_pred, K.epsilon(), 1)
         if alpha:
             batch_loss = - tf.reduce_sum(alpha * batch_y_true * (1 - batch_y_pred) ** gamma * tf.log(batch_y_pred), -1)
         else:
