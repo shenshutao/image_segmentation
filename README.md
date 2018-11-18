@@ -1,6 +1,6 @@
 ## Briefing
 This is a image semantic segmentation demo using Keras.   
-To simplify the code, I choose the horse dataset, as the class is quite balance.      
+To simplify the code, I choose the horse dataset, as the two classes are quite balanced (background and horse).      
 
 ## Hourse Dataset
 Horse dataset is downloaded from http://www.msri.org/people/members/eranb/
@@ -19,7 +19,7 @@ The custom_loss_eagermode.py is only for loss function testing purpose, testing 
 ## Class imbalance
 However the class imbalance is always a big problem in daily segmentation tasks.     
 Tried on Pascal dataset, but the result is bad, still exploring.    
-1. Weight cross entropy, what's the reasonable loss weights for classes ? (ongoing)
+1. Weight cross entropy, what's the reasonable loss weights for classes ? (the inverse class frequency? ongoing)
 2. Dice loss / GDL (onging)
 3. Tversky loss  (onging)
 
