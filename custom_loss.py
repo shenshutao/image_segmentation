@@ -36,10 +36,8 @@ def binary_crossentropy(batch_y_true, batch_y_pred):
     # 先求batch中每个样本的cross entropy值
     batch_y_pred = tf.clip_by_value(batch_y_pred, K.epsilon(), 1 - K.epsilon())  # 防止log(0)为-inf，tf里面 0 * -inf = nan
     batch_loss = batch_y_true * tf.log(batch_y_pred) + (1 - batch_y_pred) * tf.log(1 - batch_y_pred)
-    # 再对这个batch中的loss求平均值
-    loss = - tf.reduce_mean(batch_loss)
 
-    return loss
+    return batch_loss
 
 
 def binary_focal_loss(alpha=.25, gamma=2.):
@@ -51,8 +49,7 @@ def binary_focal_loss(alpha=.25, gamma=2.):
         pt = tf.where(tf.equal(batch_y_true, 1), batch_y_pred, 1 - batch_y_pred)
         # pt = tf.clip_by_value(pt, K.epsilon(), 1)  # 不会有 0 * -inf 发生，无需clip
         batch_loss = - alpha * (1 - pt) ** gamma * tf.log(pt)
-        loss = tf.reduce_mean(batch_loss)
-        return loss
+        return batch_loss
 
     return focal_loss
 
@@ -68,20 +65,19 @@ def categorical_focal_loss(alpha=None, gamma=2.):
         :param batch_y_true: 维度为 [batch_size, class_no]
         :param batch_y_pred: 维度为 [batch_size, class_no]
         """
-        # print(batch_y_true.numpy())  # eager mode 下测试会很简单，custom_loss_eagermode.py
-        # print(batch_y_pred.numpy())
+        # 归一化，加下面这段是为了兼容最后一层非Softmax的情况，如果是Softmax的输出可以注释掉，因为那个输出已经归一化了。
+        batch_y_pred /= tf.reduce_sum(batch_y_pred, -1, True)
+
         # 下面这段只是 防止 0*-inf = nan 发生的另一种方法而已, y_true == 0时，让y_pred != 0, 随便什么数字，
         # 反正这个y_pred会乘以y_true即0不会对loss值起作用，只要不发生 0 * log(0) 的情况就好。
         batch_y_pred = tf.where(tf.equal(batch_y_true, 0), tf.ones_like(batch_y_pred), batch_y_pred)
         # batch_y_pred = tf.clip_by_value(batch_y_pred, K.epsilon(), 1)  # 与上面这个，二选一
+
         if alpha:
-            batch_loss = tf.reduce_sum(- alpha * batch_y_true * (1 - batch_y_pred) ** gamma * tf.log(batch_y_pred), -1)
+            batch_loss = - tf.reduce_sum(alpha * batch_y_true * (1 - batch_y_pred) ** gamma * tf.log(batch_y_pred), -1)
         else:
-            batch_loss = tf.reduce_sum(- batch_y_true * (1 - batch_y_pred) ** gamma * tf.log(batch_y_pred), -1)
-        # print(batch_loss.numpy())
-        loss = tf.reduce_mean(batch_loss)
-        # print(loss.numpy())
-        return loss
+            batch_loss = - tf.reduce_sum(batch_y_true * (1 - batch_y_pred) ** gamma * tf.log(batch_y_pred), -1)
+        return batch_loss
 
     return focal_loss
 
@@ -90,17 +86,18 @@ def categorical_crossentropy(batch_y_true, batch_y_pred):
     """
     图片分类：
     :param batch_y_true: 维度为 [batch_size, class_no]
-    :param batch_y_pred: 维度为 [batch_size, class_no]
+    :param batch_y_pred: 维度为 [batch_size, class_no]，一般为Softmax层输出的logits
     图片分割：
     :param batch_y_true: 维度为 [batch_size, image_H, image_W, class_no]
-    :param batch_y_pred: 维度为 [batch_size, image_H, image_W, class_no]
+    :param batch_y_pred: 维度为 [batch_size, image_H, image_W, class_no]，一般为Softmax层输出的logits
     """
+    # 归一化，加下面这段是为了兼容最后一层非Softmax的情况，如果是Softmax的输出可以注释掉，因为那个输出已经归一化了。
+    batch_y_pred /= tf.reduce_sum(batch_y_pred, -1, True)
+
     # 先求batch中每个样本的cross entropy值
     batch_y_pred = tf.clip_by_value(batch_y_pred, K.epsilon(), 1)  # 防止log(0)为-inf，tf里面 0 * -inf = nan。
-    batch_loss = tf.reduce_sum(batch_y_true * tf.log(batch_y_pred), -1)  # 分类时为1， 分割时为3，放-1兼容两者。
-    # 再对这个batch中的loss求平均值
-    loss = - tf.reduce_mean(batch_loss)
-    return loss
+    batch_loss = - tf.reduce_sum(batch_y_true * tf.log(batch_y_pred), -1)  # 分类时为1， 分割时为3，放-1兼容两者。
+    return batch_loss
 
 
 def weighted_categorical_crossentropy(weights):
@@ -118,17 +115,18 @@ def weighted_categorical_crossentropy(weights):
         """
         图片分类：
         :param batch_y_true: 维度为 [batch_size, class_no]
-        :param batch_y_pred: 维度为 [batch_size, class_no]
+        :param batch_y_pred: 维度为 [batch_size, class_no]，一般为Softmax层输出的logits
         图片分割：
         :param batch_y_true: 维度为 [batch_size, image_H, image_W, class_no]
-        :param batch_y_pred: 维度为 [batch_size, image_H, image_W, class_no]
+        :param batch_y_pred: 维度为 [batch_size, image_H, image_W, class_no]，一般为Softmax层输出的logits
         """
+        # 归一化，加下面这段是为了兼容最后一层非Softmax的情况，如果是Softmax的输出可以注释掉，因为那个输出已经归一化了。
+        batch_y_pred /= tf.reduce_sum(batch_y_pred, -1, True)
+
         # 先求batch中每个样本的cross entropy值
         batch_y_pred = tf.clip_by_value(batch_y_pred, K.epsilon(), 1)
-        batch_loss = tf.reduce_sum(batch_y_true * tf.log(batch_y_pred) * weights, -1)  # 分类时为1， 分割时为3，放-1兼容两者。
-        # 再对这个batch中的loss求平均值
-        loss = - tf.reduce_mean(batch_loss)
-        return loss
+        batch_loss = - tf.reduce_sum(batch_y_true * tf.log(batch_y_pred) * weights, -1)  # 分类时为1， 分割时为3，放-1兼容两者。
+        return batch_loss
 
     return loss
 
