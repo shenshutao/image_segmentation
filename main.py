@@ -23,8 +23,8 @@ if __name__ == "__main__":
     # model = FCN.get_fcn32s_model(input_shape=(224, 224, 3), class_no=2)
     model = Unet.get_unet_model(input_shape=(224, 224, 3), class_no=2)
 
-    # model.compile(loss='categorical_crossentropy', optimizer='adam', metrics=[mean_iou(num_class=2)])
     model.compile(loss=categorical_crossentropy, optimizer='adam', metrics=[mean_iou])
+    # model.compile(loss=categorical_focal_loss(alpha=None, gamma=2.), optimizer='adam', metrics=[mean_iou])
 
     model.summary()
 
@@ -35,7 +35,7 @@ if __name__ == "__main__":
     model.fit_generator(
         train_gen,
         steps_per_epoch=100,
-        epochs=5,
+        epochs=50,
         callbacks=[checkpoint, tensor_board, learning_rate_reduction]
     )
 

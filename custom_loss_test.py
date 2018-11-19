@@ -1,4 +1,7 @@
 from custom_loss import *
+import numpy as np
+import random
+from keras.utils import to_categorical
 
 tf.enable_eager_execution()
 
@@ -6,6 +9,7 @@ if __name__ == "__main__":
     batch_bin_y_true = tf.constant([1., 1., 0., 0.])
     batch_bin_y_pred = tf.constant([1., .6, 0.1, 0.3])
     loss1 = binary_crossentropy(batch_bin_y_true, batch_bin_y_pred)
+    print(loss1.numpy())
 
     batch_cat_y_true = tf.constant([[1., 0., 0.], [0., 1., 0.]])
     batch_cat_y_pred = tf.constant([[0., 0., 1.], [0.4, 0.1, 0.]])
@@ -15,6 +19,25 @@ if __name__ == "__main__":
     wcce = weighted_categorical_crossentropy([0.5, 1, 2])
     loss3 = wcce(batch_cat_y_true, batch_cat_y_pred)
 
+    # Focal loss
+    focal_loss = binary_focal_loss()
+    loss6 = focal_loss(batch_bin_y_true, batch_bin_y_pred)
+    print(loss6.numpy())
+
+    batch_bin_y_true = tf.constant([1., 1., 0., 0.])
+    batch_bin_y_pred = tf.constant([1., 1., 0., 0.])
+    loss7 = focal_loss(batch_bin_y_true, batch_bin_y_pred)
+    print(loss7.numpy())
+
+    batch_bin_y_true = tf.constant([1., 1., 0., 0.])
+    batch_bin_y_pred = tf.constant([0., 0., 1., 1.])
+    loss8 = focal_loss(batch_bin_y_true, batch_bin_y_pred)
+    print(loss8.numpy())
+
+    cfl = categorical_focal_loss()
+    loss9 = cfl(batch_cat_y_true, batch_cat_y_pred)
+
+    # Segmentation
     # Batch:2 H:2 W:2 Class_no:3
     batch_hw_cat_y_true = tf.constant([[[[1., 0., 0.], [0., 1., 1.]], [[1., 0., 0.], [0., 1., 0.]]], [[[1., 0., 0.], [0., 1., 1.]], [[1., 0., 0.], [0., 1., 0.]]]])
     batch_hw_cat_y_pred = tf.constant([[[[0., 0., .2], [1., 1., .8]], [[.4, .1, .3], [.5, .7, .1]]], [[[1., 0., 0.], [0., 1., 1.]], [[1., 0., 0.], [0., 1., 0.]]]])
@@ -43,20 +66,8 @@ if __name__ == "__main__":
     batch_hw_preds = batch_hw_true  # 如果pred值和true值一样，loss应该为0
     loss5 = swcce(batch_hw_true, batch_hw_preds)
     print(loss5.numpy())
-
-    focal_loss = binary_focal_loss()
-    loss6 = focal_loss(batch_bin_y_true, batch_bin_y_pred)
-    print(loss6.numpy())
-
-    batch_bin_y_true = tf.constant([1., 1., 0., 0.])
-    batch_bin_y_pred = tf.constant([1., 1., 0., 0.])
-    loss7 = focal_loss(batch_bin_y_true, batch_bin_y_pred)
-    print(loss7.numpy())
-
-    batch_bin_y_true = tf.constant([1., 1., 0., 0.])
-    batch_bin_y_pred = tf.constant([0., 0., 1., 1.])
-    loss8 = focal_loss(batch_bin_y_true, batch_bin_y_pred)
-    print(loss8.numpy())
+    print(loss5.numpy().shape)
 
     cfl = categorical_focal_loss()
-    loss9 = cfl(batch_cat_y_true, batch_cat_y_pred)
+    loss9 = cfl(batch_hw_true, batch_hw_preds)
+    print(loss9.numpy().shape)
