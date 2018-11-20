@@ -6,9 +6,8 @@ from keras.models import Model
 class Unet:
     def get_unet_model(input_shape=(224, 224, 3), class_no=21):
         inputs = Input(input_shape)
-        s = Lambda(lambda x: x / 255)(inputs)
 
-        c1 = Conv2D(16, (3, 3), activation='elu', kernel_initializer='he_normal', padding='same')(s)
+        c1 = Conv2D(16, (3, 3), activation='elu', kernel_initializer='he_normal', padding='same')(inputs)
         c1 = Dropout(0.1)(c1)
         c1 = Conv2D(16, (3, 3), activation='elu', kernel_initializer='he_normal', padding='same')(c1)
         p1 = MaxPooling2D((2, 2))(c1)
