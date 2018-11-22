@@ -12,7 +12,6 @@ def get_voc_generator(voc_path, train_or_val='train', batch_size=2, input_hw=(22
         x -= 1
         return x
 
-
     if train_or_val == 'train':
         data_set_file = os.path.join(voc_path, 'ImageSets/Segmentation/train.txt')
     else:
