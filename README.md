@@ -2,7 +2,7 @@
 This is a image semantic segmentation demo using Keras.   
 To simplify the code, I choose the horse dataset, as the two classes are quite balanced (background and horse).      
 
-## Hourse Dataset
+## Horse Dataset
 Horse dataset is downloaded from http://www.msri.org/people/members/eranb/
  
 ## Nets
