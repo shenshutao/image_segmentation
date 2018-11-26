@@ -8,7 +8,7 @@ from custom_loss import *
 import numpy as np
 from keras.optimizers import Adam
 from custom_metrics import *
-from models.unet import Unet
+from models import *
 from data_gens.pascal_gen import get_voc_generator
 from keras.models import load_model
 import numpy as np
@@ -18,19 +18,20 @@ sys.setrecursionlimit(10000)
 
 if __name__ == "__main__":
     # Use VOC 2012 Dataset
-    voc2012_folder = 'D:\Datasets\VOC2012'
+    voc2012_folder = 'D:\Datasets\VOC2007'
     batch_size = 8
 
     train_gen = get_voc_generator(voc2012_folder, 'train', batch_size, input_hw=(224, 224, 3), mask_hw=(224, 224, 21))
     # model = FCN.get_fcn32s_model(input_shape=(224, 224, 3), class_no=21)
-    model = Unet.get_unet_model(input_shape=(224, 224, 3), class_no=21)
+    # model = Unet.get_unet_model(input_shape=(224, 224, 3), class_no=21)
+    model = DeepLabV3Plus.get_model(input_shape=(224, 224, 3), class_no=21)  # TODO, ongoing, still got problems, can run / can't save model.
     # # class 0 is the background, give it lower weight
 
     # loss_weight = [1, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 5, 10, 10, 10, 10, 10]
     # model.compile(loss=weighted_categorical_crossentropy(loss_weight), optimizer='adam', metrics=[mean_iou])
     # model.compile(loss=tversky(), optimizer='adam', metrics=[mean_iou])
-    # model.compile(loss=categorical_crossentropy, optimizer='adam', metrics=[mean_iou])
-    model.compile(loss=categorical_focal_loss(gamma=10.), optimizer=Adam(lr=0.05), metrics=[mean_iou])
+    model.compile(loss='categorical_crossentropy', optimizer=Adam(lr=0.05), metrics=[mean_iou])
+    # model.compile(loss=categorical_focal_loss(gamma=2.), optimizer=Adam(lr=0.05), metrics=[mean_iou])
     model.summary()
 
     checkpoint = ModelCheckpoint('unet_pascal.h5', verbose=1, save_best_only=False, period=3)
@@ -41,13 +42,12 @@ if __name__ == "__main__":
         train_gen,
         steps_per_epoch=180,
         epochs=50,
-        callbacks=[checkpoint, tensor_board, learning_rate_reduction]
+        callbacks=[tensor_board, learning_rate_reduction]
     )
-
-    model.save('unet_pascal.h5')
-
-    print('Start Test')
-    model = load_model('unet_pascal.h5', compile=False)
+    # model.save('unet_pascal.h5')
+    #
+    # print('Start Test')
+    # model = load_model('unet_pascal.h5', compile=False)
     # 取val集10张图片，测试一下效果
     val_gen = get_voc_generator(voc2012_folder, 'val', 1, input_hw=(224, 224, 3), mask_hw=(224, 224, 21))
     # Pascal Voc 使用了indexed color, 这里提取它的palette
