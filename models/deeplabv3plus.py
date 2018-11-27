@@ -182,7 +182,7 @@ class DeepLabV3Plus:
             #     layer.trainable = False
 
             # 1x1 Conv, Use dilation rate (6, 12, 18), as the output H x W is 33 x 33
-            x = DeepLabV3Plus.get_atrous_conv(x_output, atrous_rate=(6, 12, 18))
+            x = DeepLabV3Plus.get_separable_atrous_conv(x_output, atrous_rate=(6, 12, 18))
 
             x = layers.Conv2D(256, (1, 1), padding='same', use_bias=False, name='concat_projection')(x)
             x = layers.BatchNormalization(name='concat_projection_BN', epsilon=1e-5)(x)
