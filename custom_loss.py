@@ -43,13 +43,13 @@ def binary_focal_loss(alpha=.25, gamma=2.):
         :param batch_y_true: 维度为 [batch_size]
         :param batch_y_pred: 维度为 [batch_size]
         """
-        pt = tf.where(tf.equal(batch_y_true, 1), batch_y_pred, 1 - batch_y_pred)
+        batch_pt = tf.where(tf.equal(batch_y_true, 1), batch_y_pred, 1 - batch_y_pred)
 
-        batch_alpha = tf.constant(alpha, shape=K.int_shape(batch_y_true), dtype=tf.float32)
-        alpha_t = tf.where(tf.equal(batch_y_true, 1), batch_alpha, 1 - batch_alpha)
+        batch_alpha = tf.ones_like(batch_y_true) * alpha
+        batch_alpha_t = tf.where(tf.equal(batch_y_true, 1), batch_alpha, 1 - batch_alpha)
 
         # pt = tf.clip_by_value(pt, K.epsilon(), 1)  # 不会有 0 * -inf 发生，无需clip
-        batch_loss = - alpha_t * (1 - pt) ** gamma * tf.log(pt)
+        batch_loss = -  batch_alpha_t * (1 - batch_pt) ** gamma * tf.log(batch_pt)
         return batch_loss
 
     return focal_loss
