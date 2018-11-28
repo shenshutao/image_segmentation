@@ -8,7 +8,7 @@ Horse dataset is downloaded from http://www.msri.org/people/members/eranb/
 ## Nets
 1. FCN, https://arxiv.org/abs/1411.4038, translated from the original caffe code https://github.com/shelhamer/fcn.berkeleyvision.org 
 2. Unet, https://arxiv.org/abs/1505.04597    
-3. DeepLab V3+ (onging)
+3. DeepLab V3+ (onging), https://arxiv.org/abs/1802.02611
 
 ## Loss
 Inside the custom_loss.py, there are some losses not only for segmentation task, also for binary classification or category classification.
