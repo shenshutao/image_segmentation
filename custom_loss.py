@@ -34,7 +34,7 @@ def binary_crossentropy(batch_y_true, batch_y_pred):
     batch_y_pred = tf.clip_by_value(batch_y_pred, K.epsilon(), 1 - K.epsilon())  # 防止log(0)为-inf，tf里面 0 * -inf = nan
     batch_loss = batch_y_true * tf.log(batch_y_pred) + (1 - batch_y_pred) * tf.log(1 - batch_y_pred)
 
-    return batch_loss
+    return K.sum(batch_loss)
 
 
 def binary_focal_loss(alpha=.25, gamma=2.):
@@ -48,9 +48,10 @@ def binary_focal_loss(alpha=.25, gamma=2.):
         batch_alpha = tf.ones_like(batch_y_true) * alpha
         batch_alpha_t = tf.where(tf.equal(batch_y_true, 1), batch_alpha, 1 - batch_alpha)
 
-        # pt = tf.clip_by_value(pt, K.epsilon(), 1)  # 不会有 0 * -inf 发生，无需clip
+        batch_pt = tf.clip_by_value(batch_pt, K.epsilon(), 1)  # Clip value prevent inf
         batch_loss = -  batch_alpha_t * (1 - batch_pt) ** gamma * tf.log(batch_pt)
-        return batch_loss
+
+        return K.sum(batch_loss)
 
     return focal_loss
 
@@ -63,8 +64,12 @@ def categorical_focal_loss(alpha=None, gamma=2.):
 
     def focal_loss(batch_y_true, batch_y_pred):
         """
+        图片分类：
         :param batch_y_true: 维度为 [batch_size, class_no]
         :param batch_y_pred: 维度为 [batch_size, class_no]
+        图片分割：
+        :param batch_y_true: 维度为 [batch_size, image_H, image_W, class_no]
+        :param batch_y_pred: 维度为 [batch_size, image_H, image_W, class_no]
         """
         # 归一化，加下面这段是为了兼容最后一层非Softmax的情况，如果是Softmax的输出可以注释掉，因为那个输出已经归一化了。
         batch_y_pred /= tf.reduce_sum(batch_y_pred, -1, True)
@@ -76,7 +81,8 @@ def categorical_focal_loss(alpha=None, gamma=2.):
             batch_loss = - tf.reduce_sum(alpha * batch_y_true * (1 - batch_y_pred) ** gamma * tf.log(batch_y_pred), -1)
         else:
             batch_loss = - tf.reduce_sum(batch_y_true * (1 - batch_y_pred) ** gamma * tf.log(batch_y_pred), -1)
-        return batch_loss
+
+        return K.sum(batch_loss)  # 分割情况下用mean,偏导数会非常小,所以这边用sum，当然你用mean也是可以的。
 
     return focal_loss
 
@@ -96,7 +102,8 @@ def categorical_crossentropy(batch_y_true, batch_y_pred):
     # 先求batch中每个样本的cross entropy值
     batch_y_pred = tf.clip_by_value(batch_y_pred, K.epsilon(), 1)  # 防止log(0)为-inf，tf里面 0 * -inf = nan。
     batch_loss = - tf.reduce_sum(batch_y_true * tf.log(batch_y_pred), -1)  # 分类时为1， 分割时为3，放-1兼容两者。
-    return batch_loss
+
+    return K.sum(batch_loss)  # 对每个batch的loss值进行加和
 
 
 def weighted_categorical_crossentropy(weights):
@@ -125,8 +132,6 @@ def weighted_categorical_crossentropy(weights):
         # 先求batch中每个样本的cross entropy值
         batch_y_pred = tf.clip_by_value(batch_y_pred, K.epsilon(), 1)
         batch_loss = - tf.reduce_sum(batch_y_true * tf.log(batch_y_pred) * weights, -1)  # 分类时为1， 分割时为3，放-1兼容两者。
-        return batch_loss
+        return K.sum(batch_loss)
 
     return loss
-
-
