@@ -8,7 +8,6 @@ from custom_loss import *
 from custom_metrics import *
 from data_gens import *
 from models import *
-from models import deeplabv3
 
 
 sys.setrecursionlimit(10000)
@@ -16,19 +15,20 @@ sys.setrecursionlimit(10000)
 if __name__ == "__main__":
     # Use VOC 2012 Dataset
     horse_path = 'weizmann_horse_db'
-    batch_size = 2
+    batch_size = 4
 
     train_gen = horse_gen.get_horse_generator(horse_path, train_or_val='train', batch_size=batch_size,
-                                              input_hw=(513, 513, 3), mask_hw=(513, 513, 2))
+                                              input_hw=(299, 299, 3), mask_hw=(299, 299, 2))
+    val_gen = horse_gen.get_horse_generator(horse_path, 'val', batch_size=batch_size * 8, input_hw=(299, 299, 3), mask_hw=(299, 299, 2))
 
-    # model = FCN.get_fcn8s_model(input_shape=(224, 224, 3), class_no=2)
-    # model = FCN.get_fcn16s_model(input_shape=(224, 224, 3), class_no=2)
-    # model = FCN.get_fcn32s_model(input_shape=(224, 224, 3), class_no=2)
-    model = Unet.get_unet_model(input_shape=(512, 512, 3), class_no=2)
-    # model = DeepLabV3Plus.get_model(input_shape=(513, 513, 3), class_no=2)  #TODO, ongoing, still got problems, can run / can't save model.
+    # model = FCN.get_fcn8s_model(input_shape=(299, 299, 3), class_no=2)
+    # model = FCN.get_fcn16s_model(input_shape=(299, 299, 3), class_no=2)
+    # model = FCN.get_fcn32s_model(input_shape=(299, 299, 3), class_no=2)
+    # model = Unet.get_unet_model(input_shape=(299, 299, 3), class_no=2)
+    model = DeepLabV3Plus.get_model(input_shape=(299, 299, 3), class_no=2)  #TODO, ongoing, still got problems, can run / can't save model.
 
-    model.compile(loss=categorical_crossentropy, optimizer=Adam(lr=0.05), metrics=[mean_iou])
-    # model.compile(loss=categorical_focal_loss(alpha=None, gamma=2.), optimizer='adam', metrics=[mean_iou])
+    model.compile(loss='categorical_crossentropy', optimizer='adam', metrics=[mean_iou, 'acc'])
+    # model.compile(loss=categorical_focal_loss(alpha=None, gamma=2.), optimizer='adam', metrics=[mean_iou, 'acc'])
     model.summary()
 
     checkpoint = ModelCheckpoint('deeplabv3p.h5', verbose=1, save_best_only=False, period=3)
@@ -37,20 +37,23 @@ if __name__ == "__main__":
 
     model.fit_generator(
         train_gen,
-        steps_per_epoch=180,
+        steps_per_epoch=100,
         epochs=50,
+        validation_data=val_gen,
+        validation_steps=3,
         callbacks=[tensor_board, learning_rate_reduction]
     )
 
     # model.save('deeplabv3p.h5')
+    # tf.contrib.saved_model.save_keras_model(model, 'output') # available on tensorflow 1.12
 
     print('Start Test')
     # model = load_model('unet.h5', compile=False)
-    # 取val集10张图片，测试一下效果
-    val_gen = horse_gen.get_horse_generator(horse_path, 'val', 1, input_hw=(513, 513, 3), mask_hw=(513, 513, 2))
-
+    # 取val集100张图片，测试一下效果
+    val_gen2 = horse_gen.get_horse_generator(horse_path, 'val', batch_size=1, input_hw=(299, 299, 3),
+                                            mask_hw=(299, 299, 2))
     i = 0
-    for val_images, mask in val_gen:
+    for val_images, mask in val_gen2:
         img_np = val_images[0]
         img_np = (img_np + 1.) * 127.5
         im0 = Image.fromarray(np.uint8(img_np))
