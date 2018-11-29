@@ -20,6 +20,12 @@ class BilinearResizeLayer2D(Layer):
     def compute_output_shape(self, input_shape):
         return (input_shape[0], self.target_size[0], self.target_size[1], input_shape[3])
 
+    def get_config(self):  # For model serialization
+        config = super(BilinearResizeLayer2D, self).get_config()
+        if hasattr(self, 'target_size'):
+            config['target_size'] = self.target_size
+        return config
+
 
 # Only for input_size (513, 513) atrous_rates = [6, 12, 18] and output_stride = 16
 class Xception_Adv:
