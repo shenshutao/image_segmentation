@@ -25,10 +25,10 @@ if __name__ == "__main__":
     # model = FCN.get_fcn16s_model(input_shape=(299, 299, 3), class_no=2)
     # model = FCN.get_fcn32s_model(input_shape=(299, 299, 3), class_no=2)
     # model = Unet.get_unet_model(input_shape=(299, 299, 3), class_no=2)
-    model = DeepLabV3Plus.get_model(input_shape=(299, 299, 3), class_no=2)  #TODO, ongoing, still got problems, can run / can't save model.
+    model = DeepLabV3Plus.get_model(input_shape=(299, 299, 3), atrous_rate=(3, 6, 9), class_no=2)
 
-    model.compile(loss='categorical_crossentropy', optimizer='adam', metrics=[mean_iou, 'acc'])
-    # model.compile(loss=categorical_focal_loss(alpha=None, gamma=2.), optimizer='adam', metrics=[mean_iou, 'acc'])
+    # model.compile(loss='categorical_crossentropy', optimizer='adam', metrics=[mean_iou, 'acc'])
+    model.compile(loss=categorical_focal_loss(alpha=None, gamma=2.), optimizer='adam', metrics=[mean_iou, 'acc'])
     model.summary()
 
     checkpoint = ModelCheckpoint('deeplabv3p.h5', verbose=1, save_best_only=False, period=3)
@@ -44,11 +44,11 @@ if __name__ == "__main__":
         callbacks=[tensor_board, learning_rate_reduction]
     )
 
-    # model.save('deeplabv3p.h5')
+    model.save('deeplabv3p.h5')
     # tf.contrib.saved_model.save_keras_model(model, 'output') # available on tensorflow 1.12
 
     print('Start Test')
-    # model = load_model('unet.h5', compile=False)
+    model = load_model('deeplabv3p.h5', compile=False)
     # 取val集100张图片，测试一下效果
     val_gen2 = horse_gen.get_horse_generator(horse_path, 'val', batch_size=1, input_hw=(299, 299, 3),
                                             mask_hw=(299, 299, 2))

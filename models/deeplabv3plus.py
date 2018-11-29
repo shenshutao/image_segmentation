@@ -99,7 +99,7 @@ class Xception_Adv:
                 with tf.variable_scope('block_1'):
                     x = Xception_Adv.xception_moudle(x, prefix='exit_b1', depth_list=(728, 1024, 1024),
                                                      skip_connection_type='conv', ds_strides=(
-                        1, 1))  # hit the limit, stride 16, so no stride here, keep the dimension as 33x33
+                        1, 1))  # In paper only stride 16, so no stride here, keep the dimension as 33x33
 
                 with tf.variable_scope('block_2'):
                     x = Xception_Adv.xception_moudle(x, prefix='exit_b2', depth_list=(1536, 1536, 2048),
@@ -111,7 +111,6 @@ class Xception_Adv:
 
 
 class DeepLabV3Plus:
-
     def get_atrous_conv(x_output, atrous_rate=(6, 12, 18)):
         # 1x1 Conv
         aspp0 = layers.Conv2D(256, (1, 1), padding='same', use_bias=False, name='aspp0')(x_output)
@@ -191,7 +190,7 @@ class DeepLabV3Plus:
         x = layers.Concatenate()([aspp0, aspp1, aspp2, aspp3, aspp4])
         return x
 
-    def get_model(input_shape=(513, 513, 3), class_no=21):
+    def get_model(input_shape=(513, 513, 3), atrous_rate=(6, 12, 18), class_no=21):
         input_tensor = layers.Input(shape=input_shape)
         with tf.variable_scope("encoder"):
             encoder = Xception_Adv.get_enhanced_xception(input_tensor=input_tensor)
@@ -201,7 +200,7 @@ class DeepLabV3Plus:
             #     layer.trainable = False
 
             # 1x1 Conv, Use dilation rate (6, 12, 18), as the output H x W is 33 x 33
-            x = DeepLabV3Plus.get_separable_atrous_conv(x_output, atrous_rate=(6, 12, 18))
+            x = DeepLabV3Plus.get_separable_atrous_conv(x_output, atrous_rate=atrous_rate)
 
             x = layers.Conv2D(256, (1, 1), padding='same', use_bias=False, name='concat_projection')(x)
             x = layers.BatchNormalization(name='concat_projection_BN', epsilon=1e-5)(x)
