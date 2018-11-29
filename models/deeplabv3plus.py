@@ -1,8 +1,24 @@
-from keras.applications import Xception
+from keras.engine import Layer
 from keras import layers, models
 import tensorflow as tf
 import keras.backend as K
 import numpy as np
+
+
+class BilinearResizeLayer2D(Layer):
+    """
+    Instead of using Lambda layer, custom layer is a better practice.
+    And Lambda will got Serialization problem during model save.
+    """
+    def __init__(self, target_size, **kwargs):
+        self.target_size = target_size
+        super(BilinearResizeLayer2D, self).__init__(**kwargs)
+
+    def call(self, x):
+        return tf.image.resize_bilinear(x, size=self.target_size)
+
+    def compute_output_shape(self, input_shape):
+        return (input_shape[0], self.target_size[0], self.target_size[1], input_shape[3])
 
 
 # Only for input_size (513, 513) atrous_rates = [6, 12, 18] and output_stride = 16
@@ -61,13 +77,16 @@ class Xception_Adv:
                     x = layers.Activation('relu')(x)
 
                 with tf.variable_scope("block_1"):
-                    x = Xception_Adv.xception_moudle(x, prefix='entry_block1', depth_list=(128, 128, 128), skip_connection_type='conv', ds_strides=(2, 2))
+                    x = Xception_Adv.xception_moudle(x, prefix='entry_block1', depth_list=(128, 128, 128),
+                                                     skip_connection_type='conv', ds_strides=(2, 2))
 
                 with tf.variable_scope("block_2"):
-                    x = Xception_Adv.xception_moudle(x, prefix='entry_block2', depth_list=(256, 256, 256), skip_connection_type='conv', ds_strides=(2, 2))
+                    x = Xception_Adv.xception_moudle(x, prefix='entry_block2', depth_list=(256, 256, 256),
+                                                     skip_connection_type='conv', ds_strides=(2, 2))
 
                 with tf.variable_scope("block_3"):
-                    x = Xception_Adv.xception_moudle(x, prefix='entry_block3', depth_list=(728, 728, 728), skip_connection_type='conv', ds_strides=(2, 2))
+                    x = Xception_Adv.xception_moudle(x, prefix='entry_block3', depth_list=(728, 728, 728),
+                                                     skip_connection_type='conv', ds_strides=(2, 2))
 
             with tf.variable_scope("middle_flow"):
                 for i in range(16):
@@ -79,7 +98,8 @@ class Xception_Adv:
             with tf.variable_scope("exit_flow"):
                 with tf.variable_scope('block_1'):
                     x = Xception_Adv.xception_moudle(x, prefix='exit_b1', depth_list=(728, 1024, 1024),
-                                                     skip_connection_type='conv', ds_strides=(1, 1))  # hit the limit, stride 16, so no stride here, keep the dimension as 33x33
+                                                     skip_connection_type='conv', ds_strides=(
+                        1, 1))  # hit the limit, stride 16, so no stride here, keep the dimension as 33x33
 
                 with tf.variable_scope('block_2'):
                     x = Xception_Adv.xception_moudle(x, prefix='exit_b2', depth_list=(1536, 1536, 2048),
@@ -118,9 +138,9 @@ class DeepLabV3Plus:
         aspp4 = layers.Reshape((1, 1, -1))(aspp4)
         aspp4 = layers.Conv2D(256, (1, 1), padding='same', use_bias=False, name='image_pooling')(aspp4)  # 减少层数
         aspp4 = layers.Activation('relu')(aspp4)
-        aspp4 = layers.Lambda(
-            lambda s: tf.image.resize_bilinear(s, size=(K.int_shape(x_output)[1], K.int_shape(x_output)[2]),
-                                               name='UpSampling_aspp4'))(aspp4)  # Reshape back for concat
+        layers.UpSampling2D
+        aspp4 = BilinearResizeLayer2D(target_size=(K.int_shape(x_output)[1], K.int_shape(x_output)[2]),
+                                      name='UpSampling_aspp4')(aspp4)  # Reshape back for concat
 
         x = layers.Concatenate()([aspp0, aspp1, aspp2, aspp3, aspp4])
 
@@ -165,9 +185,8 @@ class DeepLabV3Plus:
         aspp4 = layers.Reshape((1, 1, -1))(aspp4)
         aspp4 = layers.Conv2D(256, (1, 1), padding='same', use_bias=False, name='image_pooling')(aspp4)  # 减少层数
         aspp4 = layers.Activation('relu')(aspp4)
-        aspp4 = layers.Lambda(
-            lambda s: tf.image.resize_bilinear(s, size=(K.int_shape(x_output)[1], K.int_shape(x_output)[2]),
-                                               name='UpSampling_aspp4'))(aspp4)  # Reshape back for concat
+        aspp4 = BilinearResizeLayer2D(target_size=(K.int_shape(x_output)[1], K.int_shape(x_output)[2]),
+                                      name='UpSampling_aspp4')(aspp4)  # Reshape back for concat
 
         x = layers.Concatenate()([aspp0, aspp1, aspp2, aspp3, aspp4])
         return x
@@ -191,8 +210,8 @@ class DeepLabV3Plus:
 
         with tf.variable_scope("decoder"):
             # x4 (x2) block
-            x = layers.Lambda(lambda s: tf.image.resize_bilinear(s, size=(
-                int(np.ceil(input_shape[0] / 4)), int(np.ceil(input_shape[0] / 4)))), name='UpSampling1')(x)
+            x = BilinearResizeLayer2D(target_size=(int(np.ceil(input_shape[0] / 4)), int(np.ceil(input_shape[0] / 4))),
+                                      name='UpSampling1')(x)
 
             skip1 = encoder.get_layer('entry_block2_c2_pointwise_bn').output
 
@@ -203,8 +222,7 @@ class DeepLabV3Plus:
             x = layers.Conv2D(304, (3, 3), padding='same')(x)
 
             x = layers.Conv2D(class_no, (1, 1), padding='same')(x)
-            x = layers.Lambda(lambda s: tf.image.resize_bilinear(s, size=K.int_shape(input_tensor)[1:3]),
-                              name='UpSampling2')(x)
+            x = BilinearResizeLayer2D(target_size=K.int_shape(input_tensor)[1:3], name='UpSampling2')(x)
 
         model = models.Model(inputs=input_tensor, outputs=x, name='deeplab_try')
 
@@ -218,4 +236,7 @@ if __name__ == "__main__":
     #
     # Xception(input_tensor=input_tensor, include_top=False).summary()
 
-    DeepLabV3Plus.get_model().summary()
+    model = DeepLabV3Plus.get_model()
+    model.summary()
+    model.save('test.h5')
+    print('Done')
