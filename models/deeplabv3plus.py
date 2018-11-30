@@ -10,6 +10,7 @@ class BilinearResizeLayer2D(Layer):
     Instead of using Lambda layer, custom layer is a better practice.
     And Lambda will got Serialization problem during model save.
     """
+
     def __init__(self, target_size, **kwargs):
         self.target_size = target_size
         super(BilinearResizeLayer2D, self).__init__(**kwargs)
@@ -18,7 +19,7 @@ class BilinearResizeLayer2D(Layer):
         return tf.image.resize_bilinear(x, size=self.target_size)
 
     def compute_output_shape(self, input_shape):
-        return (input_shape[0], self.target_size[0], self.target_size[1], input_shape[3])
+        return input_shape[0], self.target_size[0], self.target_size[1], input_shape[3]
 
     def get_config(self):  # For model serialization
         config = super(BilinearResizeLayer2D, self).get_config()
@@ -27,23 +28,30 @@ class BilinearResizeLayer2D(Layer):
         return config
 
 
-# Only for input_size (513, 513) atrous_rates = [6, 12, 18] and output_stride = 16
-class Xception_Adv:
-    def separable_conv2d_with_bn(x, prefix, filters, kernel_size=(3, 3), strides=(1, 1),
-                                 activation_fn_in_separable_conv=False):
-        """
-        Add Batch Norm Layer between Depthwise Conv & Pointwise Conv layer
-        """
-        x = layers.DepthwiseConv2D(kernel_size, strides=strides, padding='same', use_bias=False,
-                                   name=prefix + '_depthwise')(x)
-        x = layers.BatchNormalization(name=prefix + '_depthwise_bn')(x)
+def separableConv2DWithBN(filters, kernel_size=(3, 3), strides=(1, 1), dilation_rate=(1, 1),
+                          activation_fn_in_separable_conv=False, name=None):
+    """
+    The Separable Conv 2D in Deeplab V3plus is a bit different with the Keras one, it has a BN layer after the Depthwise Conv Layer,
+    and it might have activation func between the Depthwise Layer & Pointwise Layer.
+    """
+    depthwise_name, pointwise_name, output_bn = (name + '_depthwise', name + '_pointwise', name + '_bn') if name else (None, None, None)
+
+    def call(x):
+        x = layers.DepthwiseConv2D(kernel_size, strides=strides, dilation_rate=dilation_rate, padding='same',
+                                   use_bias=False, name=depthwise_name)(x)
+        x = layers.BatchNormalization()(x)
         if activation_fn_in_separable_conv:
-            x = layers.Activations('relu')(x)
-        x = layers.Conv2D(filters, (1, 1), padding='same', use_bias=False, name=prefix + '_pointwise')(x)
-        x = layers.BatchNormalization(name=prefix + '_pointwise_bn')(x)
+            x = layers.Activation('relu')(x)
+        x = layers.Conv2D(filters, (1, 1), padding='same', use_bias=False, name=pointwise_name)(x)
+        x = layers.BatchNormalization(name=output_bn)(x)
 
         return x
 
+    return call
+
+
+# Only for input_size (513, 513) atrous_rates = [6, 12, 18] and output_stride = 16
+class Xception_Adv:
     def xception_moudle(x, prefix, depth_list, skip_connection_type='conv', activation_fn_in_separable_conv=False,
                         ds_strides=(1, 1)):
         # Prepare shortcut
@@ -54,14 +62,14 @@ class Xception_Adv:
             residual = x
 
         x = layers.Activation('relu')(x)
-        x = Xception_Adv.separable_conv2d_with_bn(x, prefix + '_c1', depth_list[0],
-                                                  activation_fn_in_separable_conv=activation_fn_in_separable_conv)
+        x = separableConv2DWithBN(name=prefix + '_c1', filters=depth_list[0],
+                                  activation_fn_in_separable_conv=activation_fn_in_separable_conv)(x)
         x = layers.Activation('relu')(x)
-        x = Xception_Adv.separable_conv2d_with_bn(x, prefix + '_c2', depth_list[1],
-                                                  activation_fn_in_separable_conv=activation_fn_in_separable_conv)
+        x = separableConv2DWithBN(name=prefix + '_c2', filters=depth_list[1],
+                                  activation_fn_in_separable_conv=activation_fn_in_separable_conv)(x)
         x = layers.Activation('relu')(x)
-        x = Xception_Adv.separable_conv2d_with_bn(x, prefix + '_c3', depth_list[2], strides=ds_strides,
-                                                  activation_fn_in_separable_conv=activation_fn_in_separable_conv)
+        x = separableConv2DWithBN(name=prefix + '_c3', filters=depth_list[2], strides=ds_strides,
+                                  activation_fn_in_separable_conv=activation_fn_in_separable_conv)(x)
         if skip_connection_type in ('conv', 'sum'):
             x = layers.add([x, residual])
         return x
@@ -105,7 +113,7 @@ class Xception_Adv:
                 with tf.variable_scope('block_1'):
                     x = Xception_Adv.xception_moudle(x, prefix='exit_b1', depth_list=(728, 1024, 1024),
                                                      skip_connection_type='conv', ds_strides=(
-                        1, 1))  # In paper only stride 16, so no stride here, keep the dimension as 33x33
+                            1, 1))  # In paper only stride 16, so no stride here, keep the dimension as 33x33
 
                 with tf.variable_scope('block_2'):
                     x = Xception_Adv.xception_moudle(x, prefix='exit_b2', depth_list=(1536, 1536, 2048),
@@ -117,73 +125,27 @@ class Xception_Adv:
 
 
 class DeepLabV3Plus:
-    def get_atrous_conv(x_output, atrous_rate=(6, 12, 18)):
-        # 1x1 Conv
-        aspp0 = layers.Conv2D(256, (1, 1), padding='same', use_bias=False, name='aspp0')(x_output)
-        aspp0 = layers.BatchNormalization(name='aspp0_BN', epsilon=1e-5)(aspp0)
-        aspp0 = layers.Activation('relu', name='aspp0_activation')(aspp0)
-
-        # 3x3 Conv rate 6
-        aspp1 = layers.Conv2D(256, (3, 3), dilation_rate=(atrous_rate[0], atrous_rate[0]), padding='same')(x_output)
-        aspp1 = layers.BatchNormalization(epsilon=1e-5)(aspp1)
-        aspp1 = layers.Activation('relu')(aspp1)
-
-        # 3x3 Conv rate 12
-        aspp2 = layers.Conv2D(256, (3, 3), dilation_rate=(atrous_rate[1], atrous_rate[1]), padding='same')(x_output)
-        aspp2 = layers.BatchNormalization(epsilon=1e-5)(aspp2)
-        aspp2 = layers.Activation('relu')(aspp2)
-
-        # 3x3 Conv rate 18
-        aspp3 = layers.Conv2D(256, (3, 3), dilation_rate=(atrous_rate[2], atrous_rate[2]), padding='same')(x_output)
-        aspp3 = layers.BatchNormalization(epsilon=1e-5)(aspp3)
-        aspp3 = layers.Activation('relu')(aspp3)
-
-        # Image Pooling
-        aspp4 = layers.GlobalAveragePooling2D()(x_output)
-        aspp4 = layers.Reshape((1, 1, -1))(aspp4)
-        aspp4 = layers.Conv2D(256, (1, 1), padding='same', use_bias=False, name='image_pooling')(aspp4)  # 减少层数
-        aspp4 = layers.Activation('relu')(aspp4)
-        layers.UpSampling2D
-        aspp4 = BilinearResizeLayer2D(target_size=(K.int_shape(x_output)[1], K.int_shape(x_output)[2]),
-                                      name='UpSampling_aspp4')(aspp4)  # Reshape back for concat
-
-        x = layers.Concatenate()([aspp0, aspp1, aspp2, aspp3, aspp4])
-
-        return x
-
     # 比普通的Conv2D少了很多参数
     def get_separable_atrous_conv(x_output, atrous_rate=(6, 12, 18)):
         # 1x1 Conv
         aspp0 = layers.Conv2D(256, (1, 1), padding='same', use_bias=False, name='aspp0')(x_output)
-        aspp0 = layers.BatchNormalization(name='aspp0_BN', epsilon=1e-5)(aspp0)
-        aspp0 = layers.Activation('relu', name='aspp0_activation')(aspp0)
+        aspp0 = layers.BatchNormalization(epsilon=1e-5)(aspp0)
+        aspp0 = layers.Activation('relu')(aspp0)
 
         # 3x3 Separable Conv rate 6
-        aspp1 = layers.DepthwiseConv2D((3, 3), dilation_rate=(atrous_rate[0], atrous_rate[0]), padding='same',
-                                       use_bias=False, name='aspp1_depthwise')(x_output)
-        aspp1 = layers.BatchNormalization()(aspp1)
-        aspp1 = layers.Activation('relu')(aspp1)
-        aspp1 = layers.Conv2D(256, (1, 1), padding='same', use_bias=False, name='aspp1_pointwise')(aspp1)
-        aspp1 = layers.BatchNormalization(epsilon=1e-5)(aspp1)
+        aspp1 = separableConv2DWithBN(256, (3, 3), dilation_rate=(atrous_rate[0], atrous_rate[0]),
+                                      activation_fn_in_separable_conv=True, name='aspp1')(x_output)
         aspp1 = layers.Activation('relu')(aspp1)
 
         # 3x3 Separable Conv rate 12
-        aspp2 = layers.DepthwiseConv2D((3, 3), dilation_rate=(atrous_rate[1], atrous_rate[1]), padding='same',
-                                       use_bias=False, name='aspp2_depthwise')(x_output)
-        aspp2 = layers.BatchNormalization()(aspp2)
-        aspp2 = layers.Activation('relu')(aspp2)
-        aspp2 = layers.Conv2D(256, (1, 1), padding='same', use_bias=False, name='aspp2_pointwise')(aspp2)
-        aspp2 = layers.BatchNormalization(epsilon=1e-5)(aspp2)
+        aspp2 = separableConv2DWithBN(256, (3, 3), dilation_rate=(atrous_rate[1], atrous_rate[1]),
+                                      activation_fn_in_separable_conv=True, name='aspp2')(x_output)
         aspp2 = layers.Activation('relu')(aspp2)
 
         # 3x3 Separable Conv rate 18
-        aspp3 = layers.DepthwiseConv2D((3, 3), dilation_rate=(atrous_rate[2], atrous_rate[2]), padding='same',
-                                       use_bias=False, name='aspp3_depthwise')(x_output)
-        aspp3 = layers.BatchNormalization()(aspp3)
+        aspp3 = separableConv2DWithBN(256, (3, 3), dilation_rate=(atrous_rate[2], atrous_rate[2]),
+                                      activation_fn_in_separable_conv=True, name='aspp3')(x_output)
         aspp3 = layers.Activation('relu')(aspp3)
-        aspp3 = layers.Conv2D(256, (1, 1), padding='same', use_bias=False, name='aspp3_pointwise')(aspp3)
-        aspp3 = layers.BatchNormalization(epsilon=1e-5)(aspp3)
-        aspp2 = layers.Activation('relu')(aspp2)
 
         # Image Pooling
         aspp4 = layers.GlobalAveragePooling2D()(x_output)
@@ -205,7 +167,6 @@ class DeepLabV3Plus:
             # for layer in encoder.layers:  #  not available as pre train model is not ready here.
             #     layer.trainable = False
 
-            # 1x1 Conv, Use dilation rate (6, 12, 18), as the output H x W is 33 x 33
             x = DeepLabV3Plus.get_separable_atrous_conv(x_output, atrous_rate=atrous_rate)
 
             x = layers.Conv2D(256, (1, 1), padding='same', use_bias=False, name='concat_projection')(x)
@@ -218,7 +179,7 @@ class DeepLabV3Plus:
             x = BilinearResizeLayer2D(target_size=(int(np.ceil(input_shape[0] / 4)), int(np.ceil(input_shape[0] / 4))),
                                       name='UpSampling1')(x)
 
-            skip1 = encoder.get_layer('entry_block2_c2_pointwise_bn').output
+            skip1 = encoder.get_layer('entry_block2_c2_bn').output
 
             dec_skip1 = layers.Conv2D(48, (1, 1), padding='same', use_bias=False, name='feature_projection0')(skip1)
             dec_skip1 = layers.BatchNormalization(name='feature_projection0_BN', epsilon=1e-5)(dec_skip1)
