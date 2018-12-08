@@ -4,6 +4,8 @@ import tensorflow as tf
 import keras.backend as K
 import numpy as np
 
+from keras.applications.xception import Xception
+
 
 class BilinearResizeLayer2D(Layer):
     """
@@ -52,84 +54,7 @@ def separableConv2DWithBN(filters, kernel_size=(3, 3), strides=(1, 1), dilation_
     return call
 
 
-# Only for input_size (513, 513) atrous_rates = [6, 12, 18] and output_stride = 16
-class Xception_Adv:
-    def xception_moudle(x, prefix, depth_list, skip_connection_type='conv', activation_fn_in_separable_conv=False,
-                        ds_strides=(1, 1)):
-        # Prepare shortcut
-        if skip_connection_type == 'conv':
-            residual = layers.Conv2D(depth_list[2], (1, 1), strides=ds_strides, padding='same', use_bias=False,
-                                     kernel_initializer='he_normal')(x)
-            residual = layers.BatchNormalization()(residual)
-        elif skip_connection_type == 'sum':
-            residual = x
-
-        x = layers.Activation('relu')(x)
-        x = separableConv2DWithBN(name=prefix + '_c1', filters=depth_list[0],
-                                  activation_fn_in_separable_conv=activation_fn_in_separable_conv)(x)
-        x = layers.Activation('relu')(x)
-        x = separableConv2DWithBN(name=prefix + '_c2', filters=depth_list[1],
-                                  activation_fn_in_separable_conv=activation_fn_in_separable_conv)(x)
-        x = layers.Activation('relu')(x)
-        x = separableConv2DWithBN(name=prefix + '_c3', filters=depth_list[2], strides=ds_strides,
-                                  activation_fn_in_separable_conv=activation_fn_in_separable_conv)(x)
-        if skip_connection_type in ('conv', 'sum'):
-            x = layers.add([x, residual])
-        return x
-
-    def get_enhanced_xception(input_tensor):
-        img_input = input_tensor
-
-        with tf.variable_scope("Xception_65"):
-            with tf.variable_scope("entry_flow"):
-                with tf.variable_scope("conv_1_1"):
-                    x = layers.Conv2D(32, (3, 3), strides=(2, 2), use_bias=False, padding='same', name='entry_conv_1',
-                                      kernel_initializer='he_normal')(
-                        img_input)
-                    x = layers.BatchNormalization()(x)
-                    x = layers.Activation('relu')(x)
-
-                with tf.variable_scope("conv_1_2"):
-                    x = layers.Conv2D(64, (3, 3), use_bias=False, padding='same', name='entry_conv_2',
-                                      kernel_initializer='he_normal')(x)
-                    x = layers.BatchNormalization()(x)
-                    x = layers.Activation('relu')(x)
-
-                with tf.variable_scope("block_1"):
-                    x = Xception_Adv.xception_moudle(x, prefix='entry_block1', depth_list=(128, 128, 128),
-                                                     skip_connection_type='conv', ds_strides=(2, 2))
-
-                with tf.variable_scope("block_2"):
-                    x = Xception_Adv.xception_moudle(x, prefix='entry_block2', depth_list=(256, 256, 256),
-                                                     skip_connection_type='conv', ds_strides=(2, 2))
-
-                with tf.variable_scope("block_3"):
-                    x = Xception_Adv.xception_moudle(x, prefix='entry_block3', depth_list=(728, 728, 728),
-                                                     skip_connection_type='conv', ds_strides=(2, 2))
-
-            with tf.variable_scope("middle_flow"):
-                for i in range(16):
-                    prefix = 'unit_' + str(i + 1)
-                    with tf.variable_scope(prefix):
-                        x = Xception_Adv.xception_moudle(x, prefix=prefix, depth_list=(728, 728, 728),
-                                                         skip_connection_type='sum', ds_strides=(1, 1))
-
-            with tf.variable_scope("exit_flow"):
-                with tf.variable_scope('block_1'):
-                    x = Xception_Adv.xception_moudle(x, prefix='exit_b1', depth_list=(728, 1024, 1024),
-                                                     skip_connection_type='conv', ds_strides=(
-                            1, 1))  # In paper only stride 16, so no stride here, keep the dimension as 33x33
-
-                with tf.variable_scope('block_2'):
-                    x = Xception_Adv.xception_moudle(x, prefix='exit_b2', depth_list=(1536, 1536, 2048),
-                                                     skip_connection_type='none', ds_strides=(1, 1))
-
-        model = models.Model(inputs=img_input, outputs=x, name='enhanced_xception')
-
-        return model
-
-
-class DeepLabV3Plus:
+class MyDeepLabV3Plus:
     # 比普通的Conv2D少了很多参数
     def get_separable_atrous_conv(x_output, atrous_rate=(6, 12, 18)):
         # 1x1 Conv
@@ -165,16 +90,17 @@ class DeepLabV3Plus:
         x = layers.Concatenate()([aspp0, aspp1, aspp2, aspp3, aspp4])
         return x
 
-    def get_model(input_shape=(513, 513, 3), atrous_rate=(6, 12, 18), class_no=21):
+    def get_model(input_shape=(513, 513, 3), atrous_rate=(6, 12, 18), class_no=21, freezeEncoder=False):
         input_tensor = layers.Input(shape=input_shape)
         with tf.variable_scope("encoder"):
-            encoder = Xception_Adv.get_enhanced_xception(input_tensor=input_tensor)
+            encoder = Xception(include_top=False, weights='imagenet', input_tensor=input_tensor)
             x_output = encoder.output
 
-            # for layer in encoder.layers:  #  not available as pre train model is not ready here.
-            #     layer.trainable = False
+            if freezeEncoder:
+                for layer in encoder.layers:  #  not available as pre train model is not ready here.
+                    layer.trainable = False
 
-            x = DeepLabV3Plus.get_separable_atrous_conv(x_output, atrous_rate=atrous_rate)
+            x = MyDeepLabV3Plus.get_separable_atrous_conv(x_output, atrous_rate=atrous_rate)
 
             x = layers.Conv2D(256, (1, 1), padding='same', use_bias=False, name='concat_projection',
                               kernel_initializer='he_normal')(x)
@@ -183,8 +109,8 @@ class DeepLabV3Plus:
             x = layers.Dropout(0.1)(x)
 
         with tf.variable_scope("decoder"):
-            # x4 (x2) block
-            skip1 = encoder.get_layer('entry_block2_c2_bn').output
+            # # x4 (x2) block
+            skip1 = encoder.get_layer('block3_sepconv2_bn').output
 
             x = BilinearResizeLayer2D(target_size=(K.int_shape(skip1)[1], K.int_shape(skip1)[2]), name='UpSampling1')(x)
 
@@ -198,7 +124,7 @@ class DeepLabV3Plus:
             x = BilinearResizeLayer2D(target_size=K.int_shape(input_tensor)[1:3], name='UpSampling2')(x)
 
         x = layers.Activation('softmax')(x)
-        model = models.Model(inputs=input_tensor, outputs=x, name='deeplab_v3+')
+        model = models.Model(inputs=input_tensor, outputs=x, name='deeplab_try')
 
         return model
 
@@ -210,7 +136,7 @@ if __name__ == "__main__":
     #
     # Xception(input_tensor=input_tensor, include_top=False).summary()
 
-    model = DeepLabV3Plus.get_model()
+    model = MyDeepLabV3Plus.get_model()
     model.summary()
     model.save('test.h5')
     print('Done')

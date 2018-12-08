@@ -72,7 +72,7 @@ def categorical_focal_loss(alpha=None, gamma=2.):
         :param batch_y_pred: 维度为 [batch_size, image_H, image_W, class_no]
         """
         # 归一化，加下面这段是为了兼容最后一层非Softmax的情况，如果是Softmax的输出可以注释掉，因为那个输出已经归一化了。
-        batch_y_pred /= tf.reduce_sum(batch_y_pred, -1, True)
+        # batch_y_pred /= tf.reduce_sum(batch_y_pred, -1, True)
 
         # 防止log(0)为-inf，tf里面 0 * -inf = nan
         # 虽然也不影响back propagation，它只关心导数，不关心这个loss值。
