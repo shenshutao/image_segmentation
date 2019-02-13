@@ -4,7 +4,7 @@ import tensorflow as tf
 import keras.backend as K
 import numpy as np
 
-from keras.applications.xception import Xception
+from keras.applications.mobilenetv2 import MobileNetV2
 
 
 class BilinearResizeLayer2D(Layer):
@@ -54,7 +54,7 @@ def separableConv2DWithBN(filters, kernel_size=(3, 3), strides=(1, 1), dilation_
     return call
 
 
-class MyDeepLabV3Plus:
+class Mobilenetv2_DeepLabV3Plus:
     # 比普通的Conv2D少了很多参数
     def get_separable_atrous_conv(x_output, atrous_rate=(6, 12, 18)):
         # 1x1 Conv
@@ -93,14 +93,14 @@ class MyDeepLabV3Plus:
     def get_model(input_shape=(513, 513, 3), atrous_rate=(6, 12, 18), class_no=21, freezeEncoder=False):
         input_tensor = layers.Input(shape=input_shape)
         with tf.variable_scope("encoder"):
-            encoder = Xception(include_top=False, weights='imagenet', input_tensor=input_tensor)
+            encoder = MobileNetV2(include_top=False, weights='imagenet', input_tensor=input_tensor)
             x_output = encoder.output
 
             if freezeEncoder:
                 for layer in encoder.layers:  #  not available as pre train model is not ready here.
                     layer.trainable = False
 
-            x = MyDeepLabV3Plus.get_separable_atrous_conv(x_output, atrous_rate=atrous_rate)
+            x = Mobilenetv2_DeepLabV3Plus.get_separable_atrous_conv(x_output, atrous_rate=atrous_rate)
 
             x = layers.Conv2D(256, (1, 1), padding='same', use_bias=False, name='concat_projection',
                               kernel_initializer='he_normal')(x)
@@ -110,7 +110,7 @@ class MyDeepLabV3Plus:
 
         with tf.variable_scope("decoder"):
             # # x4 (x2) block
-            skip1 = encoder.get_layer('block3_sepconv2_bn').output
+            skip1 = encoder.get_layer('block_1_expand_relu').output
 
             x = BilinearResizeLayer2D(target_size=(K.int_shape(skip1)[1], K.int_shape(skip1)[2]), name='UpSampling1')(x)
 
@@ -131,12 +131,9 @@ class MyDeepLabV3Plus:
 
 # Test
 if __name__ == "__main__":
-    # input_tensor = layers.Input(shape=(513, 513, 3))
-    # Xception_Adv.get_enhanced_xception(input_tensor).summary()
-    #
-    # Xception(input_tensor=input_tensor, include_top=False).summary()
-
-    model = MyDeepLabV3Plus.get_model()
+    model = Mobilenetv2_DeepLabV3Plus.get_model(freezeEncoder=False)
     model.summary()
+    model2 = Mobilenetv2_DeepLabV3Plus.get_model(freezeEncoder=True)
+    model2.summary()
     model.save('test.h5')
     print('Done')
